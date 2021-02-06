@@ -3,6 +3,7 @@ package server;
 public class AuthMessage {
     private String login;
     private String password;
+    public String nick;
     private boolean authentificated = false;
 
     public String getLogin() {
@@ -23,6 +24,15 @@ public class AuthMessage {
 
     public boolean isAuthentificated() {
         return authentificated;
+    }
+
+    public String getNick() {
+//        System.out.println(nick);
+        return nick;
+    }
+
+    public void setNick(String nick) {
+        this.nick = nick;
     }
 
     public void setAuthentificated(boolean authentificated) {

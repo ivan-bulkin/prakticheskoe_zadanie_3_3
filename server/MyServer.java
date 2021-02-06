@@ -12,7 +12,7 @@ public class MyServer {
     private List<ClientHandler> clients;//здесь будем хранить список Клиентов - активных ??? Да, активных - это разделяемый ресурс между потоками
     private AuthService authService;
 
-    public MyServer() {
+    public MyServer() throws InterruptedException {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             authService = new BaseAuthService();
             authService.start();
@@ -34,7 +34,47 @@ public class MyServer {
         }
     }
 
+    //Метод, который отправляет список подключённых клиентов всем активным клиентам
+    public synchronized void broadcastClientsList() {
+        StringBuilder sb = new StringBuilder("Все подключённые клиенты: ");
+        for (ClientHandler client : clients) {//идём циклом по всем Клиентам
+            sb.append(client.getNick()).append(" ");
+        }
+        Message message = new Message();
+        message.setMessage(sb.toString());
+        try {
+            broadcastMessage(message);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    //Напишем метод отправки сообщения конкретному пользователю
+    public synchronized void sendMsgToClient(ClientHandler from, String nickTo, String msg) {
+        for (ClientHandler client : clients) {//идём циклом по всем Клиентам
+            if (client.getNick().equals(nickTo)) {
+                System.out.printf("Отправляем личное сообщение от %s, кому %s", from.getNick(), nickTo);
+                Message message = new Message();
+                message.setNick(from.getNick());
+                message.setMessage(msg);
+                client.sendMessage(message);
+                return;
+            }
+        }
+        System.out.printf("Клиент с ником %s не подключен к чату.", nickTo);
+        Message message = new Message();
+        message.setMessage("Клиент с ником " + nickTo + " не подключен к чату.");
+        from.sendMessage(message);
+    }
+
+    //Вернёмся к старому написанию метода отправки сообщений всем пользователям сразу
     public synchronized void broadcastMessage(Message message) throws IOException {//Отправка сообщения всем доступным Клиентам
+        for (ClientHandler client : clients) {//идём циклом по всем Клиентам
+            client.sendMessage(message);//отправка сообщения Клиенту
+        }
+    }
+
+/*    public synchronized void broadcastMessage(Message message) throws IOException {//Отправка сообщения всем доступным Клиентам
 //Реализовываем личные сообщения так: если клиент пишет «/w nick3 Привет», то только клиенту с ником nick3 должно прийти сообщение «Привет».
 //        System.out.println(message + "АГА");
         if (message.getMessage().contains("/w")) {//проверяем вхождение /w
@@ -58,7 +98,7 @@ public class MyServer {
 //            System.out.println(client.getNick());
             client.sendMessage(message);//отправка сообщения Клиенту
         }
-    }
+    }*/
 
     public synchronized boolean isNickBusy(String nick) {
         for (ClientHandler client : clients) {
@@ -75,9 +115,11 @@ public class MyServer {
 
     public synchronized void subscribe(ClientHandler clientHandler) {
         clients.add(clientHandler);
+        broadcastClientsList();//когда кто-то подключается, отправляем всем пользователям список активных клиентов
     }
 
     public synchronized void unsubscribe(ClientHandler clientHandler) {
         clients.remove(clientHandler);
+        broadcastClientsList();//когда кто-то отключается, отправляем всем пользователям список активных клиентов
     }
 }
