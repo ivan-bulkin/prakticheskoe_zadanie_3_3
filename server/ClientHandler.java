@@ -11,11 +11,13 @@ import java.util.concurrent.TimeUnit;
 
 public class ClientHandler {
 
+//    public static int idKlienta;
     private Socket socket;
     private MyServer myServer;
     private DataInputStream dataInputStream;
     private DataOutputStream dataOutputStream;
     public String nick;
+    public String id;
 //    public static String messageErrorLoginPassword = "";//переменная, через которую будем передавать ошибку не верного ввода логина/пароля
 
 /*    public ClientHandler(MyServer myServer, Socket socket) {
@@ -101,21 +103,27 @@ public class ClientHandler {
             try {
                 AuthMessage message = new Gson().fromJson(dataInputStream.readUTF(), AuthMessage.class);
                 String nick = myServer.getAuthService().getNickByLoginAndPass(message.getLogin(), message.getPassword());
+                String id = myServer.getAuthService().getIdByLoginAndPass(message.getLogin(), message.getPassword());
                 if (nick != null && !myServer.isNickBusy(nick)) {
                     message.setAuthentificated(true);
 //                    System.out.println("1 "+nick);
                     message.setNick(nick);
+                    message.setId(id);
                     this.nick = nick;
+                    this.id = id;
+//                    idKlienta = Integer.parseInt(id);
 //                    System.out.println("2 "+nick);
                     dataOutputStream.writeUTF(new Gson().toJson(message));
                     Message broadcastMsg = new Message();
                     broadcastMsg.setNick(nick);//Д
+                    broadcastMsg.setId(id);
                     //заккоментируем эти строчки и сообщение о том, что кто-то вошёл в чат перенесём в нажатие кнопки Войти в чат
-                    broadcastMsg.setMessage(nick + " вошёл в чат.");//здесь идёт сообщение от null - это сервер, надо-бы его для красоты заменить на слово Сервер
+                    broadcastMsg.setMessage(nick + " вошёл в чат." + ", Id: " + id);//здесь идёт сообщение от null - это сервер, надо-бы его для красоты заменить на слово Сервер
                     myServer.broadcastMessage(broadcastMsg);//отправляем сообщением всем Клиентам
                     myServer.subscribe(this);
 //                    System.out.println("3 "+nick);
                     this.nick = nick;
+                    this.id = id;
 //                    System.out.println("4 "+nick);
                     return;//Не работало, из-за того, что не было этой директивы и мы не выходили из цикла. Запись урока 7 1:53:40
                 } else {

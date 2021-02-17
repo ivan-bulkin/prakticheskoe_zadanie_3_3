@@ -7,4 +7,14 @@ public interface AuthService {
     void stop();
 
     String getNickByLoginAndPass(String login, String password);
+
+    String getIdByLoginAndPass(String login, String password);
+
+//    String getIdByLoginAndPass(String login, String password);
+
+//    String getIdByLoginAndPass(String login, String password);
+
+//    String getIdByLoginAndPass(String login, String password);
+
+//    String getIdByLoginAndPass(String login, String password);
 }

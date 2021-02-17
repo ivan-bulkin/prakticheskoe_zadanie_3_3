@@ -16,6 +16,8 @@ public class SocketServerService implements ServerService {
     private DataInputStream dataInputStream;
     public static boolean isConnected = false;//переменная, которая отвечает за то, что подсоединились мы к серверу или нет
     public static String messageServerErrors = "";//переменная, через которую будем передавать различные ошибки - потом решил сделать по-другому: пробросил исключение через openConnection
+    public static String idKlienta;//в этой переменной получим id клиента из таблицы users.id_klienta чтобы дальше его использовать для изменения данных в таблице users
+    public static String nickKlienta;//в этой переменной будем держать Ник клиента
     //пробрасывание исключения не помогло передать информацию о том, что сервер не доступен. Что-то я не так делаю, поэтому возвращаемся к передачи информации о том, что сервер не доступен через переменную messageServerErrors
 /*    public static String login;//Значение Логина будем заполнять из поля формы
     public static String password;//Значение Пароля будем заполнять из поля формы*/
@@ -34,6 +36,7 @@ public class SocketServerService implements ServerService {
             dataOutputStream = new DataOutputStream(socket.getOutputStream());
 
             AuthMessage authMessage = new AuthMessage();
+//            authMessage.setId(idKlienta);
             authMessage.setLogin(login);
             authMessage.setPassword(password);
             dataOutputStream.writeUTF(new Gson().toJson(authMessage));//Авторизуемся на сервере
@@ -43,6 +46,9 @@ public class SocketServerService implements ServerService {
                 isConnected = true;
             }
             messageServerErrors = "";//Успешно авторизовались и переменная очищена
+            idKlienta = authMessage.getId();//Получаем id пользователя из таблицы users.id_klienta, чтобы потом его использвать на стороне клиента
+            nickKlienta = authMessage.getNick();//Получаем users.nick_klienta
+//            System.out.println("Авторизуемся " + authMessage.getId());
             return authMessage.getNick();
         } catch (IOException e) {//(IOException ignored) - так можно написать, чтобы игнорировать исключения IOException
 //            System.out.println("3 " + messageServerErrors);

@@ -1,6 +1,7 @@
 package server;
 
 public class AuthMessage {
+    private String id;
     private String login;
     private String password;
     public String nick;
@@ -12,6 +13,14 @@ public class AuthMessage {
 
     public void setLogin(String login) {
         this.login = login;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
     }
 
     public String getPassword() {
@@ -34,6 +43,7 @@ public class AuthMessage {
     public void setNick(String nick) {
         this.nick = nick;
     }
+
 
     public void setAuthentificated(boolean authentificated) {
         this.authentificated = authentificated;
