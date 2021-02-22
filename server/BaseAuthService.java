@@ -1,7 +1,5 @@
 package server;
 
-import client.User;
-
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,14 +39,9 @@ public class BaseAuthService implements AuthService {
         } catch (SQLException throwables) {
             throwables.printStackTrace();
         }
-
-/*        entries.add(new Entry("ivan", "password", "nick_ivan"));
-        entries.add(new Entry("sharik", "password", "nick_sharik"));
-        entries.add(new Entry("petr", "password", "nick_petr"));*/
-//        System.out.println(entries);
     }
 
-    private class Entry {
+    public static class Entry {
         private String id;
         private String login;
         private String password;
@@ -60,16 +53,24 @@ public class BaseAuthService implements AuthService {
             this.password = password;
             this.nick = nick;
         }
+
+        public String getNick() {
+            return nick;
+        }
+
+        public void setNick(String nick) {
+            this.nick = nick;
+        }
     }
 
     @Override
     public void start() {
-        System.out.println("Сервис авторизации запушен");
+        System.out.println("Сервер: Сервис авторизации запушен");
     }
 
     @Override
     public void stop() {
-        System.out.println("Сервис авторизации остановлен");
+        System.out.println("Сервер: Сервис авторизации остановлен");
     }
 
     @Override

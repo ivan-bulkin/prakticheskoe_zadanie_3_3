@@ -22,6 +22,8 @@ public class MyServer {
                 Socket socket = serverSocket.accept();
                 System.out.println("Клиент подключился");
                 new ClientHandler(this, socket);
+//                System.out.println(clients);
+//                System.out.println(clients.toString());
 //                clients.add(new ClientHandler(this, socket));//добавляем клиента в список Клиентов, после его подключения
             }
 
@@ -43,7 +45,8 @@ public class MyServer {
         Message message = new Message();
         message.setMessage(sb.toString());
         try {
-            broadcastMessage(message);
+            if (clients.size() != 0)
+                broadcastMessage(message);//Если клиентов НОЛЬ, то и не надо запускать broadcastMessage
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -114,12 +117,18 @@ public class MyServer {
     }
 
     public synchronized void subscribe(ClientHandler clientHandler) {
+        int x = clients.size();
         clients.add(clientHandler);
-        broadcastClientsList();//когда кто-то подключается, отправляем всем пользователям список активных клиентов
+        if (x != clients.size()) {
+            broadcastClientsList();//когда кто-то подключается, отправляем всем пользователям список активных клиентов}
+        }
     }
 
     public synchronized void unsubscribe(ClientHandler clientHandler) {
+        int x = clients.size();
         clients.remove(clientHandler);
-        broadcastClientsList();//когда кто-то отключается, отправляем всем пользователям список активных клиентов
+        if (x != clients.size()) {
+            broadcastClientsList();//когда кто-то отключается, отправляем всем пользователям список активных клиентов}
+        }
     }
 }

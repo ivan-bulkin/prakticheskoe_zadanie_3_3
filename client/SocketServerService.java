@@ -19,14 +19,11 @@ public class SocketServerService implements ServerService {
     public static String idKlienta;//в этой переменной получим id клиента из таблицы users.id_klienta чтобы дальше его использовать для изменения данных в таблице users
     public static String nickKlienta;//в этой переменной будем держать Ник клиента
     //пробрасывание исключения не помогло передать информацию о том, что сервер не доступен. Что-то я не так делаю, поэтому возвращаемся к передачи информации о том, что сервер не доступен через переменную messageServerErrors
-/*    public static String login;//Значение Логина будем заполнять из поля формы
-    public static String password;//Значение Пароля будем заполнять из поля формы*/
 
     public boolean isConnected() {
         return isConnected;
     }
 
-    //    @Override
     public String authorization(String login, String password) throws IOException {//openConnection заменили на authorization
         try {
             messageServerErrors = "Сервер не доступен.";//присваиваем значение "Сервер не доступен.", чтобы потом отработать ошибку, если сервер не доступен
@@ -48,17 +45,19 @@ public class SocketServerService implements ServerService {
             messageServerErrors = "";//Успешно авторизовались и переменная очищена
             idKlienta = authMessage.getId();//Получаем id пользователя из таблицы users.id_klienta, чтобы потом его использвать на стороне клиента
             nickKlienta = authMessage.getNick();//Получаем users.nick_klienta
-//            System.out.println("Авторизуемся " + authMessage.getId());
             return authMessage.getNick();
         } catch (IOException e) {//(IOException ignored) - так можно написать, чтобы игнорировать исключения IOException
-//            System.out.println("3 " + messageServerErrors);
-//            messageServerErrors = "Сервер не доступен.";//пробрасывание исключения не помогло передать информацию о том, что сервер не доступен. Что-то я не так делаю, поэтому возвращаемся к передачи информации о том, что сервер не доступен через переменную messageServerErrors
-//            System.out.println("Не удачная попытка авторизации на стороне клиента");
+            if (e.toString().equals("java.io.EOFException")) {
+                messageServerErrors = "Не верный логин/пароль.";
+                return "";
+            }
+            if (e.getMessage().equals("Connection refused: connect")) {
+                messageServerErrors = "Сервер не доступен.";
+                return "";
+            }
 //            e.printStackTrace();//заккоментируем это, чтобы не видеть на экране кучу нехороших ругательств от Java, когда что-то пошло не так при подключении
         }
-//        System.out.println("Не удачная попытка авторизации на стороне клиента");
         return "";
-//        System.out.println("Тут мы "+server.AuthMessage.getNick());
     }
 
     @Override

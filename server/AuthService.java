@@ -10,11 +10,4 @@ public interface AuthService {
 
     String getIdByLoginAndPass(String login, String password);
 
-//    String getIdByLoginAndPass(String login, String password);
-
-//    String getIdByLoginAndPass(String login, String password);
-
-//    String getIdByLoginAndPass(String login, String password);
-
-//    String getIdByLoginAndPass(String login, String password);
 }

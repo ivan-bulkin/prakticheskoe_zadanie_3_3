@@ -13,12 +13,13 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.stage.Stage;
 import server.AuthMessage;
 import server.BaseAuthService;
 import server.Message;
 import javafx.collections.*;
 
-import java.io.IOException;
+import java.io.*;
 import java.net.URL;
 import java.sql.*;
 import java.util.*;
@@ -29,8 +30,32 @@ public class Controller implements Initializable {
     public static Connection conn = null;//будем использовать одно соединение на всю программу
     public static Statement statement;//будем использовать одно соединение на всю программу
     private ObservableList<User> usersData = FXCollections.observableArrayList();//для работы с таблицой users, в т.ч. для заполения tableview
+    private static String fullFileNameHistory;//переменная, в которой будет лежать полный путь к файлу, где хранится история чата для пользователя
+    private static BufferedWriter bufferedWriterHistory;//через BufferedWriter будем сохранять сообщения
 
-    //    public static String idKlienta;//сюда положим id клиента из users.id_klienta и будем его дальше использовать
+    //Метод, который запускаем, когда надо выйти из программы. Закрывает соединение с базой данных, останавливает потоки и делает всё, чтобы не осталось следов от работы программы
+    public static void exitIvanChat() {
+        if (conn != null) {
+            try {
+                System.out.println("Сейчас закроем соединение с базой данных.");
+                conn.close();
+                System.out.println("Соединение с базой данных успешно закрыто!");
+            } catch (Exception ex) {
+                System.out.println("Хрен. Почему-то не закрылось соединение с базой данных.");
+            }
+        }
+        if (bufferedWriterHistory != null) {//закрываем bufferedWriterHistory, который записывает историю сообщений в чат
+            try {
+                bufferedWriterHistory.flush();//Надо, чтобы записать всё полностью - делаем это здесь на всякий случай
+                bufferedWriterHistory.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        Thread.interrupted();//Останавливаем поток
+        System.exit(0);//Выходим из программы
+    }
+
     @Override
     //Всегда отрабатывает при старте программы
     public void initialize(URL url, ResourceBundle resourceBundle) {
@@ -57,6 +82,7 @@ public class Controller implements Initializable {
             conn = DriverManager.getConnection("jdbc:mysql://89.108.72.116:3306/ivanchat", "ivan", "ruaFZ7rw4XSohkR1");
             conn.setAutoCommit(true);
             statement = conn.createStatement();
+            ;
             System.out.println("Соединение с базой данных успешно произведено!");
         } catch (Exception ex) {
             System.out.println("Соединение с базой данных не произведено.");
@@ -92,18 +118,6 @@ public class Controller implements Initializable {
         );*/
 //        loginComboBox.setValue("ivan"); // устанавливаем выбранный элемент по умолчанию
     }
-/*    @FXML
-//Всегда отрабатывает при старте программы
-    public void initialize() {
-//        System.out.println("Привет!!!");
-        loginTextField.requestFocus();//передаёт фокус в поле ввода Логина
-        mainChat.setEditable(false);//не даём ничего вводить в окошко вывода сообщений чата
-//        loginTextField.setToolTipText("Введите здесь логин");
-*//*        ObservableList<String> langs = FXCollections.observableArrayList("Ivan", "JavaScript", "C#");
-        ComboBox<String> loginComboBox = new ComboBox<String>(langs);
-        loginComboBox.setValue("Ivan"); // устанавливаем выбранный элемент по умолчанию*//*
-        loginComboBox.getItems().add("Осень");
-    }*/
 
 /*    @FXML
 //Всегда срабатывает при закрытии приложения - это не срабатывает, прописал обработку нажатия на крестик в ClientApp - primaryStage.setOnCloseRequest
@@ -170,9 +184,7 @@ public class Controller implements Initializable {
     //Выбор в верхнем меню Файл-->Выход Ctrl+Q
     @FXML
     void doExit(ActionEvent event) {
-//        ClientApp.stop();
-        Thread.interrupted();//Останавливаем поток
-        System.exit(0);//Выходим из программы
+        exitIvanChat();//Выходим из программы
     }
 
     @FXML//Поле ввода нового Ника
@@ -186,15 +198,20 @@ public class Controller implements Initializable {
             showMessage(Alert.AlertType.ERROR, "Ошибка", "Вы не авторизованы и не можете изменить свой Ник.\nАвторизуйтесь, чтобы начать пользоваться чатом.");
             return;
         }
+        if (SocketServerService.nickKlienta.equals(newNikTextField.getText())) {//Не даём изменять Ник и выдаём сообщение об ошибке, если Клиент не авторизован
+            showMessage(Alert.AlertType.ERROR, "Ошибка", "Ваш Ник сейчас: " + SocketServerService.nickKlienta + ", Вы хотите новый Ник: " + newNikTextField.getText() + "\nОни одинаковые, ничего не изменено." + "\nВведите новый Ник, отличный от старого и попробуйте ещё разик.");
+            return;
+        }
         try {
             //изменяем Ник пользователя
-            int x = statement.executeUpdate("update users set nick_klienta='" + newNikTextField.getText() + "' where id_klienta=" + SocketServerService.idKlienta);
+            int x = statement.executeUpdate("update users set nick_klienta='" + newNikTextField.getText() + "' where (id_klienta=" + SocketServerService.idKlienta + ") and (nick_klienta<>'" + newNikTextField.getText() + "')");
             if (x == 1) {
                 SocketServerService.nickKlienta = newNikTextField.getText();
                 showMessage(Alert.AlertType.INFORMATION, "УСПЕШНО", "Ваш Ник изменён. Ваш новый Ник: " + SocketServerService.nickKlienta);
                 authLabel.setText("Вы он-лайн, Ваш Ник: " + SocketServerService.nickKlienta + ", Ваш id: " + SocketServerService.idKlienta);
                 showUsersTable();//обновим таблицу со всеми пользователями
-//здесь надо дописать, чтобы Ник обновился, иначе Ник в таблице изменён, но сообщения продолжают приходит под старым Ником
+//здесь надо дописать, чтобы Ник обновился на сервере, иначе Ник в таблице изменён, но сообщения продолжают приходит под старым Ником
+                serverService.sendMessage("я сменил свой Ник, мой новый Ник: " + newNikTextField.getText());
                 return;
             } else {
                 showMessage(Alert.AlertType.ERROR, "Ошибка", "Что-то пошло не так, попробуйте ещё разик.");
@@ -240,9 +257,7 @@ public class Controller implements Initializable {
             passwordPasswordField2.requestFocus();//передаёт фокус в поле повтора пароля
             return;
         }
-        try {/*(Connection conn = DriverManager.getConnection("jdbc:mysql://89.108.72.116:3306/ivanchat", "ivan", "ruaFZ7rw4XSohkR1")) {
-            conn.setAutoCommit(true);
-            Statement statement = conn.createStatement();*/
+        try {
             //Проверяем, что пользователя с таким логином не существует и если существует, то не даём идти дальше
             //Пользователи с одинаковым Ником существовать могут
             //Можно также в MySQL таблице на всякий случай поле login_klienta сделать уникальным и обрабатывать тогда исключение, которое будет отдавать БД при попытке создать пользователей с одинаковым логином
@@ -337,9 +352,7 @@ public class Controller implements Initializable {
         //Нажатие кнопки Удалить таблицу Пользователей
     void doDeleteTableUsers(ActionEvent event) {
         System.out.println("Нажатие кнопки Удалить таблицу Пользователей");
-        try {/*(Connection conn = DriverManager.getConnection("jdbc:mysql://89.108.72.116:3306/ivanchat", "ivan", "ruaFZ7rw4XSohkR1")) {
-            conn.setAutoCommit(true);
-            Statement statement = conn.createStatement();*/
+        try {
             statement.execute("DROP TABLE users");
             showMessage(Alert.AlertType.INFORMATION, "ИНФОРМАЦИЯ", "Таблица Пользователей успешно удалена.");
         } catch (SQLException throwables) {
@@ -349,7 +362,7 @@ public class Controller implements Initializable {
 
     //Нажатие кнопки Войти в ИванЧат
     @FXML
-    void doLogin(ActionEvent event) {
+    void doLogin(ActionEvent event) throws IOException {
         //Надо сразу проверить, есть-ли уже подключение и если есть, то выдаём сообщение об ошибке и дальше не идём
         if (SocketServerService.isConnected) {
             showMessage(Alert.AlertType.ERROR, "Ошибка", "Вы уже авторизованы.\nМожете пользоваться чатом.");
@@ -367,55 +380,42 @@ public class Controller implements Initializable {
             passwordPasswordField.requestFocus();//передаёт фокус в поле ввода Пароля
             return;
         }
-/*        if (!serverService.isConnected()){
-            mainChat.appendText("\nСервер\nПопробуйте авторизоваться позже.");
-        }*/
-
-        //Авторизуемся и запускаем потом, который будет получать сообщения от сервера здесь, в Нажатии кнопки Войти в ИванЧат, нет смысла делать это заранее в другом месте программы
-/*        SocketServerService.login = loginTextField.getText();
-        SocketServerService.password = passwordPasswordField.getText();*/
-//        System.out.println("1 " + SocketServerService.messageServerErrors);
+        //Авторизуемся и запускаем поток, который будет получать сообщения от сервера здесь, в Нажатии кнопки Войти в ИванЧат, нет смысла делать это заранее в другом месте программы
         serverService = new SocketServerService();
         authLabel.setText("Вы офф-лайн.");
         String nick = "";
         try {
             nick = serverService.authorization(loginTextField.getText(), passwordPasswordField.getText());//Авторизуемся, login и пароль занесли в вызов метода serverService.authorization
             if (nick != "") {
-//                String r =server.ClientHandler.idKlienta;// .BaseAuthService. .BaseAuthService .getIdByLoginAndPass(loginTextField.getText(), passwordPasswordField.getText());
-//                System.out.println(BaseAuthService.entries);//тоже выдаёт null :-(
-//                String r = serverService.getIdByLoginAndPass(loginTextField.getText(), passwordPasswordField.getText());
                 authLabel.setText("Вы он-лайн, Ваш Ник: " + nick + ", Ваш id: " + SocketServerService.idKlienta);// + " Ваш id: " + server.ClientHandler.idKlienta
             }
         } catch (IOException e) {
-            e.printStackTrace();
-            //пробрасывание исключения не помогло передать информацию о том, что сервер не доступен. Что-то я не так делаю
+            e.printStackTrace();//пробрасывание исключения не помогло передать информацию о том, что сервер не доступен. Что-то я не так делаю
         }
-//        System.out.println("2 " + SocketServerService.messageServerErrors + nick + SocketServerService.isConnected+" "+ ClientHandler.messageErrorLoginPassword);
-//        System.out.println("Не удачная попытка авторизации на стороне клиента");
         //Обрабатываем ошибку подключения к серверу, когда сервер не доступен
         if (SocketServerService.messageServerErrors == "Сервер не доступен.") {//да, это 100% не лучший метод, но я не умею пока по-другому даже equals не стал использовать
             mainChat.appendText("\n" + SocketServerService.messageServerErrors + "\nПопробуйте авторизоваться позже.");
             return;
         }
-/*        if (nick == "Такого Ника не может быть никогда") {//мне это очень не нравится, но я уже ковыряю код часа четыре и принял решение заколхозить
+        //Обрабатываем ошибку ввода не верного логина/пароля
+        if (SocketServerService.messageServerErrors == "Не верный логин/пароль.") {//мне это очень не нравится, но по-другому пока не могу. А главное, что оно работает!!!
             showMessage(Alert.AlertType.ERROR, "Ошибка", "Вы ввели не верный логин или пароль.\nВведите логин/пароль и попробуйте ещё разик.");
             loginTextField.requestFocus();//передаёт фокус в поле ввода Логина
             return;
-        }*/
-        if (SocketServerService.isConnected) {//Если успешно авторизовались, то выполняем этот код
+        }
+        if (SocketServerService.isConnected) {//Если успешно авторизовались, то выполняем этот код, запускаем поток, который висит и получает сообщения от сервера
+            mainChat.setText("");
+            loadHistoryMessage();//Загружаем последние 100 строк чата из файла history.txt
             new Thread(() -> {//поток, который висит, получает сообщения от сервера и выводит их в окно чата
                 while (true) {
                     printToUI(mainChat, serverService.readMessages());
                 }
             }).start();
-            mainChat.setText("Подключение успешно выполнено.");
+
+            mainChat.appendText("\nПодключение успешно выполнено.");
+            mainChat.appendText("\nНовая сессия чата " + nick + ":");
             serverService.sendMessage("Всем привет. Я вошёл в чат.");
-//            Message message = new Message();
-//            message.getNick();
-//            mainChat.appendText(message.getNick());
-            //как-то надо получить Ник пользователя
-//            server.BaseAuthService
-//            getNickByLoginAndPass
+
             return;
         } else {
 //            System.out.println("Не удачная попытка авторизации на стороне клиента");
@@ -423,6 +423,53 @@ public class Controller implements Initializable {
         }
     }
 
+    //Метод загружает последние 100 строк чата из файла history.txt
+    //На тот случай, если с одного устройства будут заходить разные пользователи, то мы не должны показывать сообщения одного пользователя другому
+    //для этого мы для каждого пользователя свой файл истории сообщений, для этого просто в имя файла будем добавлять id-пользователя
+    private void loadHistoryMessage() throws IOException {
+        String patch = new File("").getAbsolutePath();//Получаем полный путь к директории, откуда запущена программа
+        fullFileNameHistory = patch + "\\history_" + SocketServerService.idKlienta + ".txt";
+        File file = new File(fullFileNameHistory);//создаём file, если не указывать полный путь, то дальше будут выскакивать исключения(во всяком случае, у меня)
+        if (!file.exists()) {//Если файла history.txt не существует, мы его создаём
+            try {
+                file.createNewFile();
+            } catch (IOException e) {
+                System.out.println("Почему-то файл history_\" + SocketServerService.idKlienta + \".txt не создался, а жаль. " + e);
+            }
+            System.out.println("Файл history_" + SocketServerService.idKlienta + ".txt успешно создан");
+            return;//Ничего не выполняем дальше, т.к. файл был только что создан, а значит он пустой и читать из него нечего
+        } else {
+            BufferedReader bufferedReader = new BufferedReader(new FileReader(fullFileNameHistory));
+            BufferedReader bufferedReader2 = new BufferedReader(new FileReader(fullFileNameHistory));
+            try {
+                //Если файл уже существует, то считываем из него последние 100 строк чата
+                //сложность заключается в том, что записанная история сообщений чата добавляется в файл history.txt в конец файл, а считывать необходимое количество строк надо с конца
+                //думал изменить именно запись в файл, т.е. сделать, чтобы строки записывались не в конец файла, а в начало файла и потом надо будет просто считать нужное количество строк,
+                //но это надо будет делать каждый раз при отправке сообщения, а значит надо будет каждый раз выполнять дополнительный код, что нагрузит систему, а считываем сообщения мы всего один раз
+                //поэтому делаем так(лучшего решения я не нашёл): считаем сначала, сколько всего строк в файле, потом запускаем цикл, который идёт по файлу, но выводить строки начинаем только с нужной нам строки
+                //также не нашёл способа как встать на начало файла, т.е. если мы сделали .readLine и дошли до конца файла, то как потом вернуться и снова прочитать файл сначала??? у меня решение: только заново создать объект BufferedReader или LineNumberReader
+                //буду рад узнать другие, более лучшие варианты, если кто-то мне их предложит
+                //считаем(узнаём) сколько всего строк в файле
+                int totalLines = 0;
+                while (bufferedReader.readLine() != null) totalLines++;
+                int lines = 100;//указываем количество строк, которое нам надо прочитать с конца файла, для ДЗ № 3 надо указать 100
+                mainChat.appendText("Предыдущие " + lines + " шт. сообщений:");
+                while (bufferedReader2.ready()) {
+                    lines++;
+                    if (lines - totalLines > 0) {
+                        mainChat.appendText("\n" + bufferedReader2.readLine());
+                    } else {
+                        bufferedReader2.readLine();
+                    }
+                }
+            } catch (FileNotFoundException e) {
+                System.out.println("Ошибка чтения из bufferedReader: " + e);
+            } finally {
+                bufferedReader.close();//закрываем здесь bufferedReader
+                bufferedReader2.close();//закрываем здесь bufferedReader2
+            }
+        }
+    }
 /*    @FXML
         //Этот метод будет вызываться каждый раз, когда мы будем переключать элемент списка
     void doLoginPasswordPodstavit(ActionEvent event) {
@@ -461,15 +508,26 @@ public class Controller implements Initializable {
 
     //добавляет сообщение в окно чата
     private void printToUI(TextArea mainChat, Message message) {
-//        mainChat.appendText("\n" + message.getNick() + ": " + message.getMessage());//Добавляем с новой строки
         mainChat.appendText(message.getNick() != null ? "\n" + message.getNick() + ": " + message.getMessage() : "\nСервер: " + message.getMessage());//Добавляем с новой строки
+        String s;
+        if (message.getNick() != null) {
+            s = message.getNick() + ": " + message.getMessage();
+        } else {
+            s = "Сервер: " + message.getMessage();
+        }
+        try {
+            if (bufferedWriterHistory == null)
+                bufferedWriterHistory = new BufferedWriter(new FileWriter(fullFileNameHistory, true));//создаём bufferedWriterHistory для записи в файл истории чата
+            bufferedWriterHistory.write(s + "\n");
+            bufferedWriterHistory.flush();//Надо, чтобы записать всё полностью
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     //Нажатие кнопки Отправить сообщение
     @FXML
     void doSendMessageButton(ActionEvent event) {
-/*        Thread thread1 = new Thread() {
-            public void run() {*/
         if (!SocketServerService.isConnected) {//Не даём отправлять сообщения и выдаём сообщение об ошибке, если Клиент не авторизован
             showMessage(Alert.AlertType.ERROR, "Ошибка", "Вы не авторизованы и не можете отправлять сообщения.\nАвторизуйтесь, чтобы начать пользоваться чатом.");
             return;
@@ -477,70 +535,10 @@ public class Controller implements Initializable {
         if (myMessage.getText() == "") {//Если мы ничего не ввели, то не отправляем сообщения
             return;
         }
-//        scheduler();
         serverService.sendMessage(myMessage.getText());
         myMessage.clear();//Очищаем окно ввода сообщений
         myMessage.requestFocus();//Возвращаем фокус в окно ввода сообщений
-//        System.out.println("Почему это сразу не отрабатывает???");
-/*            }
-        };
-        Thread thread2 = new Thread() {
-            @Override
-            //переопределяем метод run
-            public void run() {
-                System.out.println("Срабатывает таймер.");
-            }
-        };
-        try {
-            thread2.sleep(2000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        thread1.start();
-        thread2.start();*/
-/*        try {
-            thread2.sleep(2000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }*/
-/*        new Thread(() -> {//создаём поток, который висит 120 секунд
-            int seconds = 0;
-            while (true) {
-                Toolkit toolkit = Toolkit.getDefaultToolkit();
-                Timer timer = new Timer();
-                timer.schedule(null, 5000);
-                if (seconds == 0) {
-                    System.out.println("Срабатывает таймер.");
-
-                }
-            }
-        }).start();*/
     }
-
-
-    /*    private void scheduler() {
-     *//*        Timer time = new Timer();
-        time.schedule(null, 1000); // Создаем задачу с повторением через 1 сек.*//*
-        Thread thread2 = new Thread() {
-            @Override
-            //переопределяем метод run
-            public void run() {
-                System.out.println("Срабатывает таймер.");
-            }
-        };
-        try {
-            thread2.sleep(2000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        thread2.start();
-    }*/
-
-/*    //отправляем сообщение
-//перенёс это в нажатие кнопки Отправить сообщение
-    private void sendMessage(TextArea myMessage) {
-        serverService.sendMessage(myMessage.getText());
-    }*/
 
     //Вот этот метод сделала сама Идея, когда я нажал на блоке кода Ctrl+Alt+M круто, в принципе
     private void showMessage(Alert.AlertType error, String s, String s2) {
